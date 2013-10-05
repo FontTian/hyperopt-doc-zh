@@ -59,3 +59,19 @@ def test_space_eval():
     assert space_eval(space, {'a': 1, 'c2': 3.5}) == ('case 2', 3.5)
     
 
+def test_quadratic1_top_shuffle():
+    trials = Trials()
+    import hyperopt.example_opt_algo
+
+    N = 5
+
+    argmin = fmin(
+            fn=lambda x: (x - 3) ** 2,
+            space=hp.uniform('x', -5, 5),
+            algo=hyperopt.example_opt_algo.suggest,
+            max_evals=N,
+            trials=trials)
+
+    assert len(trials) == N
+    assert abs(argmin['x'] - 3.0) < .25
+
