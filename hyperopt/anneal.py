@@ -1,8 +1,12 @@
 """
-Example optimization algorithm for hyperopt.
+Annealing algorithm for hyperopt
 
-This algorithm is deliberately simple, in order to document
-how to write an optimization algorithm.
+Annealing is a simple but effective variant on random search that
+takes some advantage of a smooth response surface.
+
+The simple (but not overly simple) code of simulated annealing makes this file
+a good starting point for implementing new search algorithms.
+
 """
 
 __authors__ = "James Bergstra"
@@ -10,21 +14,13 @@ __license__ = "3-clause BSD License"
 __contact__ = "github.com/jaberg/hyperopt"
 
 import logging
-import time
 from collections import deque
 
 import numpy as np
-from scipy.special import erf
 import pyll
 from pyll import scope
-from pyll.stochastic import implicit_stochastic
-
-from .base import BanditAlgo
-from .base import STATUS_OK
 from .base import miscs_to_idxs_vals
 from .base import miscs_update_idxs_vals
-from .base import Trials
-import rand
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +61,9 @@ class expr_evaluator(object):
         memo_gc=True,
         ):
         """
+        Parameters:
+        -----------
+
         expr - pyll Apply instance to be evaluated
 
         memo - optional dictionary of values to use for particular nodes
@@ -208,12 +207,17 @@ class expr_evaluator(object):
 
 
 class suggest_algo(expr_evaluator):
-    def __init__(self, domain, trials):
+    def __init__(self, domain, trials, seed):
         expr_evaluator.__init__(self, domain.s_idxs_vals)
         self.domain = domain
         self.trials = trials
+        self.label_by_node = dict([
+            (n, l) for l, n in self.domain.vh.vals_by_label().items()])
+        self._seed = seed
+        self.rng = np.random.RandomState(seed)
 
     def __call__(self, new_id):
+        self.rng.seed(self._seed + new_id)
         memo = self.eval_nodes(
             memo={self.domain.s_new_ids: [new_id]})
         idxs, vals = memo[self.expr]
@@ -227,31 +231,133 @@ class suggest_algo(expr_evaluator):
             [new_id], [None], [new_result], [new_misc])
         return rval
 
-
-class TopShuffleAlgo(suggest_algo):
-    """
-    The top-shuffle algorithm is to make suggestions by choosing randomly among the values for
-    each variable, as they occur among the top N trials. It is a simple genetic search
-    strategy. Variation is introduced into the top N trials by drawing new values from the
-    prior from time to time.
-    """
-    def __init__(self, domain, trials,
-            top_N=5,
-            p_prior=0.1):
-        suggest_algo.__init__(self, domain, trials)
-        self.top_N = top_N
-        self.p_prior = p_prior
-        print 'new call'
-        self.hyper_params = self.domain.vh.vals_by_label().values()
-        #print self.domain.vh.vals_by_label()
-
     def on_node(self, memo, node):
-        if node in self.hyper_params:
-            print '  ', node.name
-        return suggest_algo.on_node(self, memo, node)
+        if node in self.label_by_node:
+            label = self.label_by_node[node]
+            return self.on_node_hyperparameter(memo, node, label)
+        return expr_evaluator.on_node(self, memo, node)
+
+
+class annealing_algo(suggest_algo):
+    """
+    This simple annealing algorithm begins by sampling from the prior,
+    but tends over time to sample from points closer and closer to the best
+    ones observed.
+
+    This algorithm is a simple variation on random search that leverages
+    smoothness in the response surface.  The annealing rate is not adaptive.
+
+    In addition to the value of this algorithm as a baseline optimization
+    strategy, it is a simple starting point for implementing new algorithms.
+
+    """
+
+    def __init__(self, domain, trials,
+            avg_best_idx=2.0,
+            per_dimension_half_life=10.0,
+            seed=123):
+        suggest_algo.__init__(self, domain, trials, seed=seed)
+        self.avg_best_idx = avg_best_idx
+        self.per_dimension_half_life = per_dimension_half_life
+        doc_by_tid = {}
+        for doc in trials.trials:
+            # get either this docs own tid or the one that it's from
+            tid = doc['tid']
+            loss = domain.loss(doc['result'], doc['spec'])
+            if loss is None:
+                # -- associate infinite loss to new/running/failed jobs
+                loss = float('inf')
+            else:
+                loss = float(loss)
+            doc_by_tid[tid] = (doc, loss)
+        self.tid_docs_losses = sorted(doc_by_tid.items())
+        self.tids = np.asarray([t for (t, (d, l)) in self.tid_docs_losses])
+        self.losses = np.asarray([l for (t, (d, l)) in self.tid_docs_losses])
+        self.node_tids, self.node_vals = miscs_to_idxs_vals(
+            [d['misc'] for (tid, (d, l)) in self.tid_docs_losses],
+            keys=domain.params.keys())
+
+    def on_node_hyperparameter(self, memo, node, label):
+        """
+        Return a new value for one hyperparameter.
+
+        Parameters:
+        -----------
+
+        memo - a partially-filled dictionary of node -> list-of-values
+               for the nodes in a vectorized representation of the
+               original search space.
+
+        node - an Apply instance in the vectorized search space,
+               which corresponds to a hyperparameter
+
+        label - a string, the name of the hyperparameter
+
+
+        Returns: a list with one value in it: the suggested value for this
+        hyperparameter
+
+
+        Notes
+        -----
+
+        This function works by delegating to self.hp_HPTYPE functions to
+        handle each of the kinds of hyperparameters in hyperopt.pyll_utils.
+
+        Other search algorithms can implement this function without
+        delegating based on the hyperparameter type, but it's a pattern
+        I've used a few times so I show it here.
+
+        """
+        vals = self.node_vals[label]
+        losses = self.losses[self.node_tids[label]]
+        losses_vals = sorted(zip(losses, vals))
+        #print losses_vals
+        if len(vals) == 0:
+            return expr_evaluator.on_node(self, memo, node)
+        else:
+            best_idx = int(self.rng.geometric(1.0 / self.avg_best_idx))
+            best_idx = min(best_idx, len(losses_vals) - 1)
+            return getattr(self, 'hp_%s' % node.name)(
+                memo, node, label, losses_vals, best_idx)
+
+    def hp_uniform(self, memo, node, label, losses_vals, best_idx):
+        """
+        Return a new value for a uniform hyperparameter.
+
+        Parameters:
+        -----------
+
+        memo - (see on_node_hyperparameter)
+
+        node - (see on_node_hyperparameter)
+
+        label - (see on_node_hyperparameter)
+
+        losses_vals - a sorted list of (loss, value) pairs that have been
+                      observed for the current node.  The full history of all
+                      trials can be accessed via self.trials.
+
+        best_idx - the position within losses_vals whose value should be used as
+                   as the center of the sampling distribution for annealing.
+
+        Returns: a list with one value in it: the suggested value for this
+        hyperparameter
+        """
+        best_val = losses_vals[best_idx][1]
+        high = node.arg['high']._obj
+        low = node.arg['low']._obj
+        T = len(losses_vals)
+        width = (high - low) * (
+            0.5 ** (T / self.per_dimension_half_life))
+        new_high = min(high, best_val + width / 2)
+        new_low = max(low, best_val - width / 2)
+        #print 'new bounds', new_low, new_high, width
+        return [self.rng.uniform(low=new_low, high=new_high)]
 
 
 @make_suggest_many_from_suggest_one
 def suggest(new_ids, domain, trials, *args, **kwargs):
     new_id, = new_ids
-    return TopShuffleAlgo(domain, trials, *args, **kwargs)(new_id)
+    return annealing_algo(domain, trials, *args, **kwargs)(new_id)
+
