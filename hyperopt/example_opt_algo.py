@@ -241,9 +241,13 @@ class TopShuffleAlgo(suggest_algo):
         suggest_algo.__init__(self, domain, trials)
         self.top_N = top_N
         self.p_prior = p_prior
+        print 'new call'
+        self.hyper_params = self.domain.vh.vals_by_label().values()
+        #print self.domain.vh.vals_by_label()
 
     def on_node(self, memo, node):
-        print node.name
+        if node in self.hyper_params:
+            print '  ', node.name
         return suggest_algo.on_node(self, memo, node)
 
 
