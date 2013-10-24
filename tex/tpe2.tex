@@ -1,0 +1,115 @@
+\documentclass{article}
+\usepackage{fullpage}
+\usepackage{amsmath,amssymb}
+\begin{document}
+
+Suppose we have hyperparameters:
+
+\begin{equation}
+    X, Y, Z
+\end{equation}
+
+The function (f) we want to minimize has the property that Z is only used when
+X takes value 1, but X and Y are always used.
+
+We make this aspect of f apparent to the optimization engine by specifying a
+sampling space of the form:
+
+\begin{equation}
+    \mathrm{P}(Z | X) \mathrm{P}(X) P(Y)
+\end{equation}
+
+The semantics of optimization are such that we may ignore the independence
+relationships in the prior, and construct densities over the space that are
+less independent.
+
+
+\begin{equation}
+    \mathrm{P}(Z | X, Y) \mathrm{P}(X, Y)
+\end{equation}
+
+
+Optimization in the style of TPE requires that we optimize the ratio of two
+distributions over the space, which requires that we actually pick forms for
+the various terms contributing to the joint distributions.
+
+The nature of choice() nodes is such that by conditional structure, they also
+tell us to rule out large parts of the search space (e.g. P(Z | X=0) is
+ignored) and we want to retain that.  In this case, we retain that information
+by ensuring that P(Z | X, Y) is fixed to the same distribution when X = 0, in
+both the "lower" and "upper" distributions.
+
+Priors:
+\begin{align}
+    P(X) &= \alpha_{x} e^{-a_{x} - b_{x}X} \\
+    P(Y) &= \alpha_{y} e^{-a_{y} - b_{y}Y - c_{y}Y^2} \\
+    P(Z|X) &= X \alpha_{z} e^{-a_{z} - b_{z}Z - c_{z}Z^2} + (1 - X)
+\end{align}
+
+
+Supposing we had a real-valued Y, and Z and a binary-valued X, we could choose a general exponential-family form for P(X, Y):
+
+\begin{align}
+    P_u(X, Y)
+    &= \alpha_u e^{ -a_{xyu} -b_{xyu} (X~Y) -(X~Y)'c_{xyu}(X~Y)}
+\end{align}
+
+and choose a conditional form for Z so that it is either drawn from a meaningful distribution if X=1,
+or a dummy (0, 1) uniform if X = 0.
+\begin{align}
+    P_u(Z | X, Y)
+    &= X \alpha_{zu} e^{-a_{zu} - b_{zu}Z - Z'c_{zu}Z} + (1 - X)
+\end{align}
+
+
+The PEI(x) optimization strategy is to maximize $\mathrm{P}(x) \mathrm{EI}(x)$.
+
+ERROR STARTS HERE (!)
+
+The TPE approach to EI(X) finds that $EI(x) \propto \frac{1}{P_l(x)/p_u(x) + 1}$ or something,
+so the following math for folding the prior in is wrong.
+
+Hopefully after fixing this up, the nasty asymptotic instability identified below will go away.
+
+XXX
+%In this case the ratio between the lower and upper densities would look
+%like:
+
+\begin{align}
+    & P(X, Y, Z)\frac{P_u(X, Y, Z)}{P_l(X, Y, Z)}\\
+    & P(X) P(Y) P(Z|X) \frac{P_u(X, Y) P_u(Z|X, Y)}{P_l(X, Y) P_l(Z|X, Y)} \\
+    %& \frac{P(X)P_u(X)}{P_l(X)} \frac{P(Y)P_u(Y | X)}{P_l(Y | X)} \frac{P(Z|X)P_u(Z|X, Y)}{P_l(Z|X, Y)} \\
+    %& \frac{(X p_{x} + (1 - X) (1 - p_{x}))(X p_{ux} + (1 - X) (1 - p_{ux}))}{X p_{lx} + (1 - X) (1 - p_{lx})}
+    %\frac{P(Y)P_u(Y | X)}{P_l(Y | X)}
+    %\frac{P(Z|X)P_u(Z|X, Y)}{P_l(Z|X, Y)} \\
+\end{align}
+
+Derivation of X Y part.
+\begin{align}
+    \frac{P(X) P(Y) P_u(X, Y)}{P_l(X, Y)}
+    &= \frac{
+        \alpha_{x} e^{-a_{x} - b_{x}X}
+        \alpha_{y} e^{-a_{y} - b_{y}Y - c_{y}Y^2}
+        \alpha_u e^{ -a_{xyu} -b_{xyu} (X~Y) -(X~Y)'c_{xyu}(X~Y)}
+    }{
+        \alpha_l e^{ -a_{xyl} -b_{xyl} (X~Y) -(X~Y)'c_{xyl}(X~Y)}
+    } \\
+    &= \frac{ \alpha_{x} \alpha_{y} \alpha_u }{ \alpha_l }
+    e^{ - (a_{x} a_{y} a_{xyu} -a_{xyl})
+        - ((b_{x}~ b_{y}) - b_{xyu} + b_{xyl})(X~Y)
+        - (X~Y)'((0~0~0~c_y) + c_{xyu} - c_{xyl})(X~Y)
+    }
+\end{align}
+
+Unfortunately there is no guarantee that this function actually takes a maximum. If it happens that $c_y + c_{xyu}$ is less than $c_{xyl}$ then it means that the lower distribution is more tightly distributed than the upper one, and consequently there is an axis along which the ratio grows without bound in both directions.
+Intuitively this corresponds to the possible, but unusual situation where a small group of points is all bad, and the set of good points has a larger spread. In this situation, the model will generalize that even further-away points from the bad core will be even better... overwhelming the multiplication by $P(x)$ and going out of control.
+
+As soon as the model actually tries one of those far-away points and sees that it's bad, the system will self-correct. Still, it would be nice to not try anything {\em too} crazy.
+I think the earliest source of this insanity is that the ratio $P_u / P_l$ is supposed to represent expected improvement.
+The problem 
+Hacking time.
+One totally heuristic option would be to put some bound of e.g. 6$\sigma$ on normally-distributed variables.
+Another option
+
+\end{document}
+
