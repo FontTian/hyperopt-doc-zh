@@ -1,209 +1,287 @@
 \documentclass{article}
 \usepackage{fullpage}
 \usepackage{amsmath,amssymb}
+\title{Probability-weighted Expected Improvement}
 \begin{document}
+\maketitle
 
-\section{EI the TPE way}
+\begin{abstract}
+Expected Improvement (EI) is a popular criterion for trial selection in sequential model-based optimization (SMBO, aka Bayesian Optimization, BO).
+In multidimensional or non-finite search spaces (e.g. $\mathbb{R}^N$) we can improve the search efficiency of EI-SMBO enormously by
+providing guidance on where to look, in form of a probability density $P(x)$ that encodes a belief in where the optimal value of $x$ may be found.
+Indeed, typical EI applications can be seen as making an implicit assumption that $P(x)$ is a uniform distribution over a unit hypercube.
+Recognizing this probability density explicitly gives rise to a new criterion for trial selection,
+dubbed here Probability-weighted Expected Improvement (PEI).
+PEI generalizes EI, and opens up a new class of response surface models (unbounded mean functions) for SMBO algorithms.
+PEI also resolves mathematical issues in the ``TPE'' approach to Bayesian Optimization, providing more solid mathematical footing to the class of ``Domain-Based''
+Bayesian Optimization strategies that model $P(X|Y)$ instead of $P(Y|X)$.
+\end{abstract}
 
-\begin{align}
-    \mathrm{EI}(x; y^{*}) &= \int_{y^{*}}^{\infty} (y - y^{*})p(y|x) dy \\
-    &= \int_{y^{*}}^{\infty} (y - y^{*})\frac{p(x|y)p(y)}{\int_{y'}p(x|y')p(y')} dy \\
-    &= \frac{\int_{y^{*}}^{\infty} (y - y^{*})p(x|y)p(y) dy}{\int p(x|y')p(y') {dy'}}
-\end{align}
+\section{Introduction}
 
-The idea of the TPE derivation is to suppose that
-$p(x|y)$ has the form of one density $g(x)$ for Good points that are Greater than $y^*$, and
-another density $l(x)$ for Lousy points that are Lesser than $y^*$.
+    Blackbox optimization.
+    We want to minimize some non-differentiable function $f: {\mathcal X} \rightarrow \mathbb{R}$, over some domain $\mathcal X$.
 
-With this assumption, lets work on the numerator and denominator separately.
-The numerator is proportional to $g(x)$, with a constant of proportionality that depends in some way on $p(y)$ and $y^*$.
-\begin{align}
-    \int_{y^{*}}^{\infty} (y - y^{*})p(x|y)p(y) dy
-    &= \int_{y^{*}}^{\infty} (y - y^{*})g(x)p(y) dy \\
-    &= g(x)\int_{y^{*}}^{\infty} (y - y^{*})p(y) dy \\
-    &= g(x) C
-\end{align}
+\section{Why Domain-based Bayesian Optimization?}
 
-If we suppose that $y^*$ is chosen to be some $\alpha$'th percentile of values drawn from $p(y)$, then we can rework the denominator as follows:
-\begin{align}
-    \int p(x|y')p(y') {dy'}
-    &= \int_{-\infty}^{y^*}p(x|y')p(y') dy' + \int_{y^*}^{-\infty}p(x|y')p(y') dy' \\
-    &= \int_{-\infty}^{y^*}l(x)p(y') dy' + \int_{y^*}^{-\infty}g(x)p(y') dy' \\
-    &= l(x)\int_{-\infty}^{y^*}p(y') dy' + g(x)\int_{y^*}^{-\infty}p(y') dy' \\
-    &= l(x) \alpha + g(x)(1 - \alpha)
-\end{align}
+    The usual approach to SMBO is to use e.g. machine learning techniques to model $f$, but it is also possible to build an EI algorithm around
+    density models over the input domain $\mathcal X$.
+    if we assume some density $P$ over $\mathcal X$, then
+    we can see $f$ as inducing a joint probability density $P(X, Y)$ over the joint space of ${\mathcal X} \times \mathbb{R}$.
+    The usual approach is to model this joint density as $P(X)P(Y|X)$,
+    but it can also be interesting to model $P(Y)P(X|Y)$.
 
-Coming back the development of EI$(x)$, we continue
-\begin{align}
-\mathrm{EI}(x; y^{*})
-    &= \frac{Cg(x)}{\alpha l(x) + (1 - \alpha) g(x)} \\
-    &= \frac{\beta}{\frac{l(x)}{g(x)} + \gamma} \\
-\beta 
-    &= \frac{C}{\alpha} \\
-    &= \int_{y^{*}}^{\infty} \frac{(y - y^{*})p(y)}{\alpha} dy \\
-\gamma
-    &= \frac{1 - \alpha)}{\alpha}.
-\end{align}
+    It is interesting to model $P(X|Y)$ in SMBO because is can be natural to express a search preference in terms of a distribution over input space.
+    Relatedly, it is natural to think of transferring hyperparameter optimization expertise between tasks in terms of a distribution over input space.
+    The intuition in multitask transfer is that some parts of the model space just ``work better'', and a density over $\mathcal{X}$ can capture that.
+    In contrast, task transfer when modeling $P(Y|X)$ is awkward because the vertical scaling of response surfaces is quite different for different
+    machine learning tasks.
+
+\subsection{Domain-Based Expected Improvement for TPE}
+
+    Expected Improvement (EI) is a greedy heuristic for SMBO that works well in practice.
+
+    \begin{align}
+        \mathrm{EI}(x; y^{*}) &= \int_{y^{*}}^{\infty} (y - y^{*})p(y|x) dy \\
+        &= \int_{y^{*}}^{\infty} (y - y^{*})\frac{p(x|y)p(y)}{\int_{y'}p(x|y')p(y')} dy \\
+        &= \frac{\int_{y^{*}}^{\infty} (y - y^{*})p(x|y)p(y) dy}{\int p(x|y')p(y') {dy'}}
+    \end{align}
+
+    To go further we need to pick a form for $p(x|y)$.
+    In the TPE algorithm, is based on modeling
+    $p(x|y)$ as one density $g(x)$ for Good points that are Greater than $y^*$, and
+    another density $l(x)$ for Lousy points that are Lesser than $y^*$.
+    (XXX I think I switched from minimization to maximization here by accident.)
+
+    With this assumption, lets work on the numerator and denominator separately.
+    The numerator is proportional to $g(x)$, with a constant of proportionality that depends in some way on $p(y)$ and $y^*$.
+    \begin{align}
+        \int_{y^{*}}^{\infty} (y - y^{*})p(x|y)p(y) dy
+        &= \int_{y^{*}}^{\infty} (y - y^{*})g(x)p(y) dy \\
+        &= g(x)\int_{y^{*}}^{\infty} (y - y^{*})p(y) dy \\
+        &= g(x) C
+    \end{align}
+
+    If we suppose that $y^*$ is chosen to be some $\alpha$'th percentile of values drawn from $p(y)$, then we can rework the denominator as follows:
+    \begin{align}
+        \int p(x|y')p(y') {dy'}
+        &= \int_{-\infty}^{y^*}p(x|y')p(y') dy' + \int_{y^*}^{-\infty}p(x|y')p(y') dy' \\
+        &= \int_{-\infty}^{y^*}l(x)p(y') dy' + \int_{y^*}^{-\infty}g(x)p(y') dy' \\
+        &= l(x)\int_{-\infty}^{y^*}p(y') dy' + g(x)\int_{y^*}^{-\infty}p(y') dy' \\
+        &= l(x) \alpha + g(x)(1 - \alpha)
+    \end{align}
+
+    Coming back the development of EI$(x)$, we continue
+    \begin{align}
+    \mathrm{EI}(x; y^{*})
+        &= \frac{Cg(x)}{\alpha l(x) + (1 - \alpha) g(x)} \\
+        &= \frac{\beta}{\frac{l(x)}{g(x)} + \gamma} \\
+    \beta 
+        &= \frac{C}{\alpha} \\
+        &= \int_{y^{*}}^{\infty} \frac{(y - y^{*})p(y)}{\alpha} dy \\
+    \gamma
+        &= \frac{1 - \alpha)}{\alpha}.
+    \end{align}
+
 
 
 \section{PEI}
 
-PEI is defined as the product $P(x) EI(x)$, it is expected improvement weighted by a prior belief that $x$ might be the location of the maximum value of $y$.
+    There are two problems with the formula for EI developed for the TPE algorithm.
+    \begin{enumerate}
+        \item At the outset it is natural that $g(x) = l(x) \forall x$, but if that's the case, then EI is the same everywhere.
+            How should we choose the first point? It is customary in EI approaches to sample a few random points at first to get things started,
+            but this seems ad-hoc. How many points should we need to get things ``started''?  What does ``started'' even  mean in a technical sense?
+        \item If, for whatever reason, it should happen that $g(x)$ is an asymptotically broader distribution than $l(x)$,
+            then it may be that EI grows without bound in some direction. This doesn't make any sense, and if it happens it would certainly
+            interfere with the efficiency of the algorithm.
+    \end{enumerate}
 
-\begin{align}
-\mathrm{PEI}(x; y^{*})
-    &= \mathrm{P}(x) \mathrm{EI}(x; y^*) \\
-    &= \frac{\mathrm{P}(x)\beta}{\frac{l(x)}{g(x)} + \gamma} \\
-    &\propto \frac{\mathrm{P}(x)}{\frac{l(x)}{g(x)} + \gamma}
-\end{align}
+    I propose to solve both these issues (one a general EI problem, and one related to EI with unbounded surrogate functions) by generalizing
+    the EI criterion itself, and instead using a Probability-weighted EI criterion (PEI)
+    defined as the product $P(x) EI(x)$.
+    (I think of PEI as expected improvement weighted by a prior belief that $x$ might be the location of the maximum value of $y$, but
+    working through the consequences of that seems to get me into trouble so far, there's some attempt to do so below.)
 
-The PEI selection criterion has the reasonable property of scaling the expected improvement term to lie between 0 and $P(x)/\gamma$.
-Critically, this criterion allows for the selection of reasonable points right from the beginning of search (no seeding is necessary)
-and allows for progressive exploration of unbounded search spaces (e.g. $x \in \mathbb{R}$).
+    What does PEI do for the TPE derivation?
+    \begin{align}
+    \mathrm{PEI}(x; y^{*})
+        &= \mathrm{P}(x) \mathrm{EI}(x; y^*) \\
+        &= \frac{\mathrm{P}(x)\beta}{\frac{l(x)}{g(x)} + \gamma} \\
+        &\propto \frac{\mathrm{P}(x)}{\frac{l(x)}{g(x)} + \gamma}
+    \end{align}
 
-Making sure some corner cases are treated OK:
-\begin{itemize}
-\item Asymptotically, $l$ dominates $g$. 
-    $\lim_{x \rightarrow \infty} g(x) / l(x) \rightarrow 0$.
-    In this case, we have a broad $l$ and a tight $g$. We want to pick a point that optimizes their ratio, and we don't want the P term to interfere.
-    This should indeed happen, because the few narrow peaks in $g(x)$ should cause PEI to spike to $P(x)/\gamma$, which is a slowly varying ceiling on what we expect to get.
-\item Asymptotically, $g$ dominates $l$.
-    $\lim_{x \rightarrow \infty} g(x) / l(x) \rightarrow \infty$.
-    In this case, we have a broad $g$ and a tight $l$. We want to pick any point in the space, but just not one close to the small bad zone $l$.
-    We find indeed that $\lim_{x \rightarrow \infty} PEI(x) = \frac{P(x)}{\gamma} = 0$.
-\end{itemize}
+    The PEI selection criterion has the reasonable property of scaling the expected improvement term to lie between 0 and $P(x)/\gamma$.
+    Critically, this criterion allows for the selection of reasonable points right from the beginning of search (no seeding is necessary)
+    and allows for progressive exploration of unbounded search spaces (e.g. $x \in \mathbb{R}$).
+
+    Making sure some corner cases are treated OK:
+    \begin{itemize}
+    \item Asymptotically, $l$ dominates $g$. 
+        $\lim_{x \rightarrow \infty} g(x) / l(x) \rightarrow 0$.
+        In this case, we have a broad $l$ and a tight $g$. We want to pick a point that optimizes their ratio, and we don't want the P term to interfere.
+        This should indeed happen, because the few narrow peaks in $g(x)$ should cause PEI to spike to $P(x)/\gamma$, which is a slowly varying ceiling on what we expect to get.
+    \item Asymptotically, $g$ dominates $l$.
+        $\lim_{x \rightarrow \infty} g(x) / l(x) \rightarrow \infty$.
+        In this case, we have a broad $g$ and a tight $l$. We want to pick any point in the space, but just not one close to the small bad zone $l$.
+        We find indeed that $\lim_{x \rightarrow \infty} PEI(x) = \frac{P(x)}{\gamma} = 0$.
+    \end{itemize}
 
 
-\section{Wrinkles}
+\subsection{Estimating $\alpha$}
 
-\subsection{Estimating \alpha}
+    One slight wrinkle (ha ha) in the use of Bayes' Rule for EI is that, we don't actually have a stochastic process in the joint $x, y$ space.
+    We really just start with a possibly-stochastic function $f:x \rightarrow y$.
+    The idea of a joint density over $x, y$ random variables comes from the thought experiment of imposing a particular sampling distribution over $x$,
+    and thereby inducing a density $P(x, y)$. 
+    This is a density whose generative model certainly factorizes most naturally as $P(x)P(y|x)$, but we're free to chop it the other way too.
+    Anyway, the wrinkle is that $\alpha$ is supposed to be chosen as some percentile of the $P(y)$ marginal of the original density,
+    and we don't know what that is.
+    Even though we don't know what's our effective $\alpha$, we need to estimate it to figure out what is $\gamma$, and for $\alpha$ close to $1.0$, $\gamma$ is 
+    in fact enormously sensitive to the value of $\alpha$.
+    I don't have a better idea for what to do about this than to heuristically
+    schedule that $\alpha$ moves from e.g. .5 to .95 and then doesn't grow any further toward 1.0 for fear of overestimating it.
 
-One wrinkle in the use of Bayes' Rule for EI is that, we don't actually have a stochastic process in the joint $x, y$ space.
-We just have a function $f:x \rightarrow y$.
-The idea of a joint density over $x, y$ random variables comes from the thought experiment of imposing a particular sampling distribution over $x$,
-and thereby inducing a density $P(x, y)$. 
-This is a density whose generative model certainly factorizes most naturally as $P(x)P(y|x)$, but we're free to chop it the other way too.
-Anyway, the wrinkle is that $\alpha$ is supposed to be chosen as some percentile of the $P(y)$ marginal of {\em this} original density, from which
-we do not actually draw more than one sample as we perform optimization.
-The points we draw during optimization are not drawn from $P(x)$, but rather some other implicit sequence of densities that tend
-to place more mass on values of $X$ that are close to high-performance areas.
-So if we choose the observed $y$ value at the 75'th percentile, then we are, in effect using a value of $\alpha$ that could be anywhere between $.75$ and $1.0$.
-Even though we don't know what's our effective $\alpha$, we need to estimate it to figure out what is $\gamma$, and for $\alpha$ close to $1.0$, $\gamma$ is 
-in fact enormously sensitive to the value of $\alpha$.
-To be most accurate therefore, there should probably be some sort of schedule that moves $\alpha$ from an initial value where it matches the $y^*$ percentile,
-to a final value of e.g. .99 where it doesn't grow any further.
+\end{document}
+
+\section{Following the max}
+
+    \begin{itemize}
+        \item Probability that a given point is actually the maximum (uses measurement uncertainty, forces user to set prior on $P(y)$.)
+        \item Probability for point $x$ of sampling the maximum from a localized density about $x$.
+    \end{itemize}
+
+    Standard Domain-based EI derivation:
+    \begin{align}
+        \mathrm{EI}(x; y^{*}) &= \int_{y^{*}}^{\infty} (y - y^{*})p(y|x) dy \\
+        &= \int_{y^{*}}^{\infty} (y - y^{*})\frac{p(x|y)p(y)}{\int_{y'}p(x|y')p(y')} dy \\
+        &= \frac{\int_{y^{*}}^{\infty} (y - y^{*})p(x|y)p(y) dy}
+                {\int p(x|y')p(y') {dy'}}
+    \end{align}
+
+    Let's do something different about $P(x|y)$ though. Instead of making it a piecewise constant function,
+    let's make a version that accumulates evidence more incrementally.
+    $P(x)$ was originally meant to be our belief in where the max in $y$ might be found.
+    $P(x|y)$ is supposed to mean
+    \begin{align}
+        p(x|y) 
+        &= \frac{\gamma P(x) + \sum_i p(x; x_i, y_i)p(y; y_i) }
+                {\gamma + \sum_i p(y; y_i)}
+    \end{align}
+
+    This not-so-parametric formulation of $P(x|y)$ draws a comparison with SMBO methods based on Gaussian processes.
+    The notation $p(x; x_i, y_i)$ is meant to represent an updated belief in where the maximum point in the space is,
+    given that we measured $y_i = f(x_i)$.
 
 
 
 \section{A specific example of PEI}
 
-Suppose we have hyperparameters:
+    Suppose we have hyperparameters:
 
-\begin{equation}
-    X, Y, Z
-\end{equation}
+    \begin{equation}
+        X, Y, Z
+    \end{equation}
 
-The function (f) we want to minimize has the property that Z is only used when
-X takes value 1, but X and Y are always used.
+    The function (f) we want to minimize has the property that Z is only used when
+    X takes value 1, but X and Y are always used.
 
-We make this aspect of f apparent to the optimization engine by specifying a
-sampling space of the form:
+    We make this aspect of f apparent to the optimization engine by specifying a
+    sampling space of the form:
 
-\begin{equation}
-    \mathrm{P}(Z | X) \mathrm{P}(X) P(Y)
-\end{equation}
+    \begin{equation}
+        \mathrm{P}(Z | X) \mathrm{P}(X) P(Y)
+    \end{equation}
 
-The semantics of optimization are such that we may ignore the independence
-relationships in the prior, and construct densities over the space that are
-less independent.
-
-
-\begin{equation}
-    \mathrm{P}(Z | X, Y) \mathrm{P}(X, Y)
-\end{equation}
+    The semantics of optimization are such that we may ignore the independence
+    relationships in the prior, and construct densities over the space that are
+    less independent.
 
 
-Optimization in the style of TPE requires that we optimize the ratio of two
-distributions over the space, which requires that we actually pick forms for
-the various terms contributing to the joint distributions.
-
-The nature of choice() nodes is such that by conditional structure, they also
-tell us to rule out large parts of the search space (e.g. P(Z | X=0) is
-ignored) and we want to retain that.  In this case, we retain that information
-by ensuring that P(Z | X, Y) is fixed to the same distribution when X = 0, in
-both the "lower" and "upper" distributions.
-
-Priors:
-\begin{align}
-    P(X) &= \alpha_{x} e^{-a_{x} - b_{x}X} \\
-    P(Y) &= \alpha_{y} e^{-a_{y} - b_{y}Y - c_{y}Y^2} \\
-    P(Z|X) &= X \alpha_{z} e^{-a_{z} - b_{z}Z - c_{z}Z^2} + (1 - X)
-\end{align}
+    \begin{equation}
+        \mathrm{P}(Z | X, Y) \mathrm{P}(X, Y)
+    \end{equation}
 
 
-Supposing we had a real-valued Y, and Z and a binary-valued X, we could choose a general exponential-family form for P(X, Y):
+    Optimization in the style of TPE requires that we optimize the ratio of two
+    distributions over the space, which requires that we actually pick forms for
+    the various terms contributing to the joint distributions.
 
-\begin{align}
-    P_u(X, Y)
-    &= \alpha_u e^{ -a_{xyu} -b_{xyu} (X~Y) -(X~Y)'c_{xyu}(X~Y)}
-\end{align}
+    The nature of choice() nodes is such that by conditional structure, they also
+    tell us to rule out large parts of the search space (e.g. P(Z | X=0) is
+    ignored) and we want to retain that.  In this case, we retain that information
+    by ensuring that P(Z | X, Y) is fixed to the same distribution when X = 0, in
+    both the "lower" and "upper" distributions.
 
-and choose a conditional form for Z so that it is either drawn from a meaningful distribution if X=1,
-or a dummy (0, 1) uniform if X = 0.
-\begin{align}
-    P_u(Z | X, Y)
-    &= X \alpha_{zu} e^{-a_{zu} - b_{zu}Z - Z'c_{zu}Z} + (1 - X)
-\end{align}
+    Priors:
+    \begin{align}
+        P(X) &= \alpha_{x} e^{-a_{x} - b_{x}X} \\
+        P(Y) &= \alpha_{y} e^{-a_{y} - b_{y}Y - c_{y}Y^2} \\
+        P(Z|X) &= X \alpha_{z} e^{-a_{z} - b_{z}Z - c_{z}Z^2} + (1 - X)
+    \end{align}
 
 
-The PEI(x) optimization strategy is to maximize $\mathrm{P}(x) \mathrm{EI}(x)$.
+    Supposing we had a real-valued Y, and Z and a binary-valued X, we could choose a general exponential-family form for P(X, Y):
 
-ERROR STARTS HERE (!)
+    \begin{align}
+        P_u(X, Y)
+        &= \alpha_u e^{ -a_{xyu} -b_{xyu} (X~Y) -(X~Y)'c_{xyu}(X~Y)}
+    \end{align}
 
-The TPE approach to EI(X) finds that $EI(x) \propto \frac{1}{P_l(x)/p_u(x) + 1}$ or something,
-so the following math for folding the prior in is wrong.
+    and choose a conditional form for Z so that it is either drawn from a meaningful distribution if X=1,
+    or a dummy (0, 1) uniform if X = 0.
+    \begin{align}
+        P_u(Z | X, Y)
+        &= X \alpha_{zu} e^{-a_{zu} - b_{zu}Z - Z'c_{zu}Z} + (1 - X)
+    \end{align}
 
-Hopefully after fixing this up, the nasty asymptotic instability identified below will go away.
 
-XXX
-%In this case the ratio between the lower and upper densities would look
-%like:
+    The PEI(x) optimization strategy is to maximize $\mathrm{P}(x) \mathrm{EI}(x)$.
 
-\begin{align}
-    & P(X, Y, Z)\frac{P_u(X, Y, Z)}{P_l(X, Y, Z)}\\
-    & P(X) P(Y) P(Z|X) \frac{P_u(X, Y) P_u(Z|X, Y)}{P_l(X, Y) P_l(Z|X, Y)} \\
-    %& \frac{P(X)P_u(X)}{P_l(X)} \frac{P(Y)P_u(Y | X)}{P_l(Y | X)} \frac{P(Z|X)P_u(Z|X, Y)}{P_l(Z|X, Y)} \\
-    %& \frac{(X p_{x} + (1 - X) (1 - p_{x}))(X p_{ux} + (1 - X) (1 - p_{ux}))}{X p_{lx} + (1 - X) (1 - p_{lx})}
-    %\frac{P(Y)P_u(Y | X)}{P_l(Y | X)}
-    %\frac{P(Z|X)P_u(Z|X, Y)}{P_l(Z|X, Y)} \\
-\end{align}
+    ERROR STARTS HERE (!)
 
-Derivation of X Y part.
-\begin{align}
-    \frac{P(X) P(Y) P_u(X, Y)}{P_l(X, Y)}
-    &= \frac{
-        \alpha_{x} e^{-a_{x} - b_{x}X}
-        \alpha_{y} e^{-a_{y} - b_{y}Y - c_{y}Y^2}
-        \alpha_u e^{ -a_{xyu} -b_{xyu} (X~Y) -(X~Y)'c_{xyu}(X~Y)}
-    }{
-        \alpha_l e^{ -a_{xyl} -b_{xyl} (X~Y) -(X~Y)'c_{xyl}(X~Y)}
-    } \\
-    &= \frac{ \alpha_{x} \alpha_{y} \alpha_u }{ \alpha_l }
-    e^{ - (a_{x} a_{y} a_{xyu} -a_{xyl})
-        - ((b_{x}~ b_{y}) - b_{xyu} + b_{xyl})(X~Y)
-        - (X~Y)'((0~0~0~c_y) + c_{xyu} - c_{xyl})(X~Y)
-    }
-\end{align}
+    The TPE approach to EI(X) finds that $EI(x) \propto \frac{1}{P_l(x)/p_u(x) + 1}$ or something,
+    so the following math for folding the prior in is wrong.
 
-Unfortunately there is no guarantee that this function actually takes a maximum. If it happens that $c_y + c_{xyu}$ is less than $c_{xyl}$ then it means that the lower distribution is more tightly distributed than the upper one, and consequently there is an axis along which the ratio grows without bound in both directions.
-Intuitively this corresponds to the possible, but unusual situation where a small group of points is all bad, and the set of good points has a larger spread. In this situation, the model will generalize that even further-away points from the bad core will be even better... overwhelming the multiplication by $P(x)$ and going out of control.
+    Hopefully after fixing this up, the nasty asymptotic instability identified below will go away.
 
-As soon as the model actually tries one of those far-away points and sees that it's bad, the system will self-correct. Still, it would be nice to not try anything {\em too} crazy.
-I think the earliest source of this insanity is that the ratio $P_u / P_l$ is supposed to represent expected improvement.
-The problem 
-Hacking time.
-One totally heuristic option would be to put some bound of e.g. 6$\sigma$ on normally-distributed variables.
-Another option
+    XXX
+    %In this case the ratio between the lower and upper densities would look
+    %like:
 
-\end{document}
+    \begin{align}
+        & P(X, Y, Z)\frac{P_u(X, Y, Z)}{P_l(X, Y, Z)}\\
+        & P(X) P(Y) P(Z|X) \frac{P_u(X, Y) P_u(Z|X, Y)}{P_l(X, Y) P_l(Z|X, Y)} \\
+        %& \frac{P(X)P_u(X)}{P_l(X)} \frac{P(Y)P_u(Y | X)}{P_l(Y | X)} \frac{P(Z|X)P_u(Z|X, Y)}{P_l(Z|X, Y)} \\
+        %& \frac{(X p_{x} + (1 - X) (1 - p_{x}))(X p_{ux} + (1 - X) (1 - p_{ux}))}{X p_{lx} + (1 - X) (1 - p_{lx})}
+        %\frac{P(Y)P_u(Y | X)}{P_l(Y | X)}
+        %\frac{P(Z|X)P_u(Z|X, Y)}{P_l(Z|X, Y)} \\
+    \end{align}
+
+    Derivation of X Y part.
+    \begin{align}
+        \frac{P(X) P(Y) P_u(X, Y)}{P_l(X, Y)}
+        &= \frac{
+            \alpha_{x} e^{-a_{x} - b_{x}X}
+            \alpha_{y} e^{-a_{y} - b_{y}Y - c_{y}Y^2}
+            \alpha_u e^{ -a_{xyu} -b_{xyu} (X~Y) -(X~Y)'c_{xyu}(X~Y)}
+        }{
+            \alpha_l e^{ -a_{xyl} -b_{xyl} (X~Y) -(X~Y)'c_{xyl}(X~Y)}
+        } \\
+        &= \frac{ \alpha_{x} \alpha_{y} \alpha_u }{ \alpha_l }
+        e^{ - (a_{x} a_{y} a_{xyu} -a_{xyl})
+            - ((b_{x}~ b_{y}) - b_{xyu} + b_{xyl})(X~Y)
+            - (X~Y)'((0~0~0~c_y) + c_{xyu} - c_{xyl})(X~Y)
+        }
+    \end{align}
+
+    Unfortunately there is no guarantee that this function actually takes a maximum. If it happens that $c_y + c_{xyu}$ is less than $c_{xyl}$ then it means that the lower distribution is more tightly distributed than the upper one, and consequently there is an axis along which the ratio grows without bound in both directions.
+    Intuitively this corresponds to the possible, but unusual situation where a small group of points is all bad, and the set of good points has a larger spread. In this situation, the model will generalize that even further-away points from the bad core will be even better... overwhelming the multiplication by $P(x)$ and going out of control.
+
+    As soon as the model actually tries one of those far-away points and sees that it's bad, the system will self-correct. Still, it would be nice to not try anything {\em too} crazy.
+    I think the earliest source of this insanity is that the ratio $P_u / P_l$ is supposed to represent expected improvement.
+    The problem 
+    Hacking time.
+    One totally heuristic option would be to put some bound of e.g. 6$\sigma$ on normally-distributed variables.
+    Another option
 
