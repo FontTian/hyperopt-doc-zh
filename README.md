@@ -1,4 +1,4 @@
-*在2017年的圣诞节前，[我](http://blog.csdn.net/fontthrone)翻译了有关[HyperOpt的中文文档](http://blog.csdn.net/FontThrone/article/category/7362018)，这也时填补了空白，以此作为献给所有中国程序员，以及所有其他机器学习相关行业人员的圣诞礼物。圣诞快乐，各位。*
+*在2017年的圣诞节前，[我](http://blog.csdn.net/fontthrone)翻译了有关[HyperOpt的中文文档](http://blog.csdn.net/FontThrone/article/category/7362018)，这也时填补了一个空白，以此作为献给所有中国程序员，以及所有其他机器学习相关行业人员的圣诞礼物。圣诞快乐，各位。*
 
 本项目内容包括学习教程,原Hyperopt项目代码的中文注释,wiki中文文档等内容.
 
