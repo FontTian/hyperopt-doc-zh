@@ -1,0 +1,1 @@
+* [How to sample some of the values of a configuration space given values for some of the other ones](http://nbviewer.ipython.org/urls/raw.github.com/jaberg/hyperopt/master/recipes/Partial-sampling%2520in%2520hyperopt.ipynb)
