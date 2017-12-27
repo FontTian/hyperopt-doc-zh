@@ -1,13 +1,31 @@
+## 简介
+
+Github开源项目hyperopt系列的中文文档,以及学习教程等
+
+目录结构如下:
+
+ - master
+	- hyperopt文档
+		- doc_en 英文版文档
+		- doc_cn 中文版文档
+		- examples  实例
+
+你也可以在本人的[CSDN博客](http://blog.csdn.net/fontthrone)查看相应文档与其他内容
+
+
+
+
+## 更新日志
 *在2017年的圣诞节前，[我](http://blog.csdn.net/fontthrone)翻译了有关[HyperOpt的中文文档](http://blog.csdn.net/FontThrone/article/category/7362018)，这也时填补了一个空白，以此作为献给所有中国程序员，以及所有其他机器学习相关行业人员的圣诞礼物。圣诞快乐，各位。*
 
-本项目内容包括学习教程,原Hyperopt项目代码的中文注释,wiki中文文档等内容.
-相较于原hyperopt新增目录如下
+本项目内容包括hyperopt系列开源项目的学习教程,代码的中文注释,wiki中文文档等内容.
+2017年17月27日更新,相较于原hyperopt新增目录如下
 
  - 目录
-	- doc 文档
-		- en 英文版文档
-		- cn 中文版文档
-	- examples  例子
+	- hyperopt文档
+		- doc_en 英文版文档
+		- doc_cn 中文版文档
+		- examples  例子
 		 
 
 
@@ -42,4 +60,5 @@ This project has received support from
 * D-Wave Systems, Inc.
 
 
+ Inc.
 
