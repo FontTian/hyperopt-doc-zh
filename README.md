@@ -6,8 +6,8 @@ Github开源项目hyperopt系列的中文文档,以及学习教程等
 
  - master
 	- hyperopt文档
-		- doc_en 英文版文档
-		- doc_cn 中文版文档
+		- doc/en 英文版文档
+		- doc/cn 中文版文档
 		- examples  实例
 
 你也可以在本人的[CSDN博客](http://blog.csdn.net/fontthrone)查看相应文档与其他内容
@@ -58,6 +58,3 @@ This project has received support from
 * Banting Postdoctoral Fellowship program, 
 * National Science and Engineering Research Council of Canada (NSERC),
 * D-Wave Systems, Inc.
-
-
- Inc.
