@@ -8,14 +8,20 @@ Github开源项目hyperopt系列的中文文档,以及学习教程等
 	- hyperopt文档
 		- doc/en 英文版文档
 		- doc/cn 中文版文档
-		- examples  实例
-
+		- tutorials  教程目录
+			- zh 中文教程
+			- en 英文教程
 你也可以在本人的[CSDN博客](http://blog.csdn.net/fontthrone)查看相应文档与其他内容
 
 
 
 
 ## 更新日志
+
+-----
+12/15/2018 更新
+
+-----
 *在2017年的圣诞节前，[我](http://blog.csdn.net/fontthrone)翻译了有关[HyperOpt的中文文档](http://blog.csdn.net/FontThrone/article/category/7362018)，这也算是填补了一个空白，以此作为献给所有中国程序员，以及所有其他机器学习相关行业人员的圣诞礼物。圣诞快乐，各位。*
 
 本项目内容包括hyperopt系列开源项目的学习教程,代码的中文注释,wiki中文文档等内容.
