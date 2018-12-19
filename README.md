@@ -20,6 +20,11 @@ Github开源项目hyperopt系列的中文文档,以及学习教程等
 
 
 ## 更新日志
+
+----
+
+12/19/2018 添加了Hyperopt入门指南
+
 -----
 
 12/18/2018 更新了Hyperopt在Lightgbm上的使用，并添加了xgboost与lightgbm快速上手教程
