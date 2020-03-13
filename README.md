@@ -14,7 +14,7 @@ Github开源项目hyperopt系列的中文文档,以及学习教程等
 		- en 英文教程
 
 
-你也可以在本人的[CSDN博客](http://blog.csdn.net/fontthrone)查看相应文档与其他内容
+你也可以在本人的[CSDN博客](https://blog.csdn.net/fontthrone/category_7362018.html)——[Hyperopt中文文档导读](https://blog.csdn.net/FontThrone/article/details/78880397)查看相应文档与其他内容
 
 
 
